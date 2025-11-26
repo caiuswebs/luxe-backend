@@ -6,18 +6,20 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 8080;
+// ========== CONFIG ==========
+const BUSAN_BASE_URL = "https://1gamestopup.com/api/v1";
+const BUSAN_API_KEY = process.env.BUSAN_API_KEY; // Set this in Railway Variables
 
-// 🔑 YOUR BUSAN API KEY (SET THIS IN RAILWAY ENV VARIABLES)
-const BUSAN_API_KEY = process.env.BUSAN_API_KEY;
-const BUSAN_URL = "https://1gamestopup.com/api/v1";
-
-// ✅ STATUS ROUTE
+// ========== STATUS ROUTE ==========
 app.get("/", (req, res) => {
-  res.send("✅ Luxe REAL ID Checker Backend is Running");
+  res.json({
+    status: "online",
+    server: "Luxe ID Checker Backend",
+    time: new Date().toISOString()
+  });
 });
 
-// ✅ 100% REAL MLBB ID CHECK
+// ========== MLBB REAL ID VERIFICATION ==========
 app.post("/verify-id", async (req, res) => {
   const { uid, zone } = req.body;
 
@@ -25,22 +27,32 @@ app.post("/verify-id", async (req, res) => {
     return res.json({
       success: false,
       valid: false,
-      message: "UID and Zone required"
+      message: "UID and Zone are required"
     });
   }
 
-  // Basic safety check
+  // Basic pattern safety (pre-check)
   if (!/^\d+$/.test(uid) || !/^\d+$/.test(zone)) {
     return res.json({
       success: true,
       valid: false,
-      message: "ID must be numbers only"
+      message: "ID must contain numbers only"
     });
   }
 
   try {
+    /*
+      ⚠️ IMPORTANT:
+      Busan does not provide a public 'verify-only' endpoint in some plans.
+      So the industry standard method is:
+      - Try a small validation/dry-run order OR
+      - Use their validator if enabled for your account
+
+      Below is a SAFE VALIDATION REQUEST using their structure.
+    */
+
     const response = await axios.post(
-      `${BUSAN_URL}/api-service/validate-id`,
+      `${BUSAN_BASE_URL}/api-service/validate-id`,
       {
         game: "mobile_legends",
         userid: uid,
@@ -54,12 +66,12 @@ app.post("/verify-id", async (req, res) => {
       }
     );
 
-    // ✅ Only TRUE if Busan confirms
-    if (response.data && (response.data.success || response.data.username)) {
+    // If Busan confirms ID
+    if (response.data && response.data.success) {
       return res.json({
         success: true,
         valid: true,
-        username: response.data.username || "MLBB Player"
+        username: response.data.username || "Verified Player"
       });
     } else {
       return res.json({
@@ -70,15 +82,18 @@ app.post("/verify-id", async (req, res) => {
     }
 
   } catch (error) {
-    console.error("Busan Error:", error.message);
+    console.error("Busan Verify Error:", error.message);
+
     return res.json({
       success: false,
       valid: false,
-      message: "Verification failed"
+      message: "Verification failed or service unavailable"
     });
   }
 });
 
+// ========== SERVER START ==========
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log("✅ Luxe REAL ID Checker Running on port " + PORT);
+  console.log("✅ Luxe Backend running on port " + PORT);
 });
